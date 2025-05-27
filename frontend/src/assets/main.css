@@ -1,0 +1,59 @@
+/* Bootstrap CSS */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+/* Кастомные стили */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8f9fa;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* Кастомные утилиты */
+.bg-gray-50 {
+  background-color: #f8f9fa;
+}
+
+.text-gray-600 {
+  color: #6c757d;
+}
+
+.text-gray-700 {
+  color: #495057;
+}
+
+.text-gray-900 {
+  color: #212529;
+}
+
+.border-gray-200 {
+  border-color: #dee2e6;
+}
+
+.border-gray-300 {
+  border-color: #ced4da;
+}
+
+/* Логотип */
+.logo-icon {
+  width: 24px;
+  height: 24px;
+  background-color: white;
+  border-radius: 4px;
+  transform: rotate(45deg);
+}
+
+/* Анимации */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

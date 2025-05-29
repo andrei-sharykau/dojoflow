@@ -8,7 +8,8 @@ import type {
   LoginCredentials,
   TokenResponse,
   StudentCreate,
-  AttestationCreate
+  AttestationCreate,
+  ClubWithStudents
 } from '../types'
 
 const API_BASE_URL = 'http://localhost:8000/api'
@@ -103,6 +104,12 @@ export const clubsAPI = {
 
   async getById(id: number): Promise<Club> {
     const response = await api.get(`/clubs/${id}/`)
+    return response.data
+  },
+
+  async getStudentsByClub(search?: string): Promise<ClubWithStudents[]> {
+    const params = search ? { search } : {}
+    const response = await api.get('/clubs/students_by_club/', { params })
     return response.data
   },
 }

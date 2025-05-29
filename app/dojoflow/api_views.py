@@ -40,6 +40,36 @@ class ClubViewSet(viewsets.ReadOnlyModelViewSet):
         
         # Возвращаем только клубы, которыми управляет пользователь
         return Club.objects.filter(admins__user=user).distinct()
+    
+    @action(detail=False, methods=['get'])
+    def students_by_club(self, request):
+        """Получить список занимающихся в разрезе клуба"""
+        clubs = self.get_queryset()
+        result = []
+        
+        for club in clubs:
+            students = club.students.select_related('current_level').order_by('last_name', 'first_name')
+            
+            # Применяем поиск если указан
+            search = request.query_params.get('search', None)
+            if search:
+                students = students.filter(
+                    Q(last_name__icontains=search) |
+                    Q(first_name__icontains=search) |
+                    Q(middle_name__icontains=search) |
+                    Q(phone__icontains=search)
+                )
+            
+            club_data = {
+                'id': club.id,
+                'name': club.name,
+                'city': club.city,
+                'students_count': students.count(),
+                'students': StudentListSerializer(students, many=True).data
+            }
+            result.append(club_data)
+        
+        return Response(result)
 
 
 class AttestationLevelViewSet(viewsets.ReadOnlyModelViewSet):

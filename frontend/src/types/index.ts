@@ -14,6 +14,14 @@ export interface Club {
   students_count: number
 }
 
+export interface ClubWithStudents {
+  id: number
+  name: string
+  city: string
+  students_count: number
+  students: Student[]
+}
+
 export interface AttestationLevel {
   id: number
   level: string

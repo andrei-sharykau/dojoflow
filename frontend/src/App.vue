@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 
@@ -10,10 +10,17 @@ const showClubDropdown = ref(false)
 const currentClub = computed(() => {
   // Получаем текущий клуб из query параметра или первый доступный
   const clubId = router.currentRoute.value.query.club
+  console.log('currentClub computed: clubId from URL =', clubId, 'available clubs =', authStore.userClubs.length)
+  
   if (clubId) {
-    return authStore.userClubs.find(club => club.id === Number(clubId))
+    const foundClub = authStore.userClubs.find(club => club.id === Number(clubId))
+    console.log('Found club by ID:', foundClub?.name || 'not found')
+    return foundClub
   }
-  return authStore.userClubs[0] || null
+  
+  const firstClub = authStore.userClubs[0] || null
+  console.log('Using first club:', firstClub?.name || 'no clubs')
+  return firstClub
 })
 
 async function logout() {
@@ -22,17 +29,66 @@ async function logout() {
 }
 
 function selectClub(club: any) {
+  console.log('selectClub вызвана для клуба:', club.name)
+  
   showClubDropdown.value = false
+  
+  // Если выбирается тот же клуб, ничего не делаем
+  if (currentClub.value?.id === club.id) {
+    console.log('Клуб уже выбран, пропускаем')
+    return
+  }
+  
+  console.log('Переключаем клуб с', currentClub.value?.name, 'на', club.name)
+  
   // Обновляем URL с выбранным клубом
   router.push({ 
     name: router.currentRoute.value.name || 'dashboard', 
     query: { club: club.id } 
+  }).then(() => {
+    console.log('URL обновлен, новый клуб:', club.name)
+  }).catch(err => {
+    console.error('Ошибка при обновлении URL:', err)
   })
+}
+
+function closeDropdown() {
+  showClubDropdown.value = false
+}
+
+// Обработчик клика вне области dropdown
+function handleClickOutside(event: Event) {
+  const target = event.target as HTMLElement
+  const dropdown = document.querySelector('.dropdown')
+  
+  if (dropdown && !dropdown.contains(target)) {
+    showClubDropdown.value = false
+  }
 }
 
 onMounted(async () => {
   // Инициализация auth store теперь происходит в router guard
   // Здесь можно добавить другую логику инициализации приложения
+  
+  // Добавляем обработчик клика вне области
+  document.addEventListener('click', handleClickOutside)
+  
+  // Автоматически выбираем первый клуб, если не выбран и есть клубы
+  setTimeout(() => {
+    if (!currentClub.value && authStore.userClubs.length > 0 && !router.currentRoute.value.query.club) {
+      const firstClub = authStore.userClubs[0]
+      console.log('Автоматически выбираем первый клуб:', firstClub.name)
+      router.push({ 
+        name: router.currentRoute.value.name || 'dashboard', 
+        query: { club: firstClub.id } 
+      })
+    }
+  }, 500) // Небольшая задержка для завершения инициализации
+})
+
+onUnmounted(() => {
+  // Удаляем обработчик клика вне области
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
@@ -62,35 +118,87 @@ onMounted(async () => {
           </div>
           
           <!-- Выбор клуба -->
-          <div v-if="authStore.userClubs.length > 1" class="dropdown me-auto ms-3">
+          <div class="dropdown ms-3 position-relative">
             <button 
-              class="btn btn-outline-secondary btn-sm dropdown-toggle" 
-              type="button" 
-              data-bs-toggle="dropdown"
-              @click="showClubDropdown = !showClubDropdown"
+              class="btn btn-outline-primary dropdown-toggle d-flex align-items-center" 
+              type="button"
+              @click.stop="showClubDropdown = !showClubDropdown"
+              :class="{ 'btn-primary text-white': currentClub }"
             >
-              {{ currentClub?.name || 'Выберите клуб' }}
+              <i class="bi bi-building me-2"></i>
+              <div class="text-start">
+                <div class="fw-medium">
+                  {{ currentClub?.name || 'Выберите клуб' }}
+                </div>
+                <div class="small opacity-75" v-if="currentClub">
+                  {{ currentClub.city }} • {{ currentClub.students_count }} студентов
+                </div>
+              </div>
             </button>
-            <ul class="dropdown-menu" :class="{ show: showClubDropdown }">
+            <ul 
+              v-show="showClubDropdown" 
+              class="dropdown-menu dropdown-menu-end shadow show position-absolute" 
+              style="min-width: 300px; top: 100%; right: 0; z-index: 1050;"
+              @click.stop
+            >
+              <li class="dropdown-header d-flex justify-content-between align-items-center">
+                <span class="fw-medium">Ваши клубы</span>
+                <span class="badge bg-primary">{{ authStore.userClubs.length }}</span>
+              </li>
+              <li><hr class="dropdown-divider"></li>
               <li v-for="club in authStore.userClubs" :key="club.id">
                 <button 
-                  class="dropdown-item d-flex justify-content-between align-items-center"
-                  :class="{ active: currentClub?.id === club.id }"
+                  class="dropdown-item d-flex justify-content-between align-items-center py-3 w-100 border-0 bg-transparent"
+                  :class="{ 
+                    'active': currentClub?.id === club.id,
+                    'bg-light': currentClub?.id === club.id 
+                  }"
                   @click="selectClub(club)"
+                  type="button"
                 >
-                  <div>
-                    <div class="fw-medium">{{ club.name }}</div>
-                    <small class="text-gray-600">{{ club.city }}</small>
+                  <div class="d-flex align-items-center">
+                    <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                      <i class="bi bi-building text-white"></i>
+                    </div>
+                    <div>
+                      <div class="fw-medium text-gray-900">{{ club.name }}</div>
+                      <small class="text-gray-600">{{ club.city }}</small>
+                    </div>
                   </div>
-                  <small class="text-gray-600">{{ club.students_count }} студентов</small>
+                  <div class="text-end">
+                    <div class="badge bg-success mb-1">{{ club.students_count }}</div>
+                    <div class="small text-gray-600">студентов</div>
+                  </div>
                 </button>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <div class="dropdown-item-text small text-gray-600 text-center">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Переключение между клубами обновляет список студентов
+                </div>
               </li>
             </ul>
           </div>
           
-          <!-- Название клуба если только один -->
-          <div v-else-if="currentClub" class="me-auto ms-3">
-            <span class="badge bg-light text-gray-700 fs-6">{{ currentClub.name }}</span>
+          <!-- Навигационные ссылки -->
+          <div class="navbar-nav flex-row me-auto ms-4">
+            <router-link 
+              to="/dashboard" 
+              class="nav-link me-3"
+              :class="{ 'fw-bold text-primary': $route.name === 'dashboard' }"
+            >
+              <i class="bi bi-house me-1"></i>
+              Главная
+            </router-link>
+            <router-link 
+              to="/attestations" 
+              class="nav-link"
+              :class="{ 'fw-bold text-primary': $route.name === 'attestations' }"
+            >
+              <i class="bi bi-award me-1"></i>
+              Аттестации
+            </router-link>
           </div>
           
           <!-- Правая часть: Пользователь и выход -->
@@ -146,8 +254,8 @@ onMounted(async () => {
       </div>
     </div>
     
-    <!-- Overlay для закрытия dropdown -->
-    <div v-if="showClubDropdown" @click="showClubDropdown = false" class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1040;"></div>
+    <!-- Overlay для закрытия dropdown (опционально, у нас есть обработчик клика) -->
+    <div v-if="showClubDropdown" @click="closeDropdown" class="position-fixed top-0 start-0 w-100 h-100" style="z-index: 1040; background-color: transparent;"></div>
   </div>
 </template>
 

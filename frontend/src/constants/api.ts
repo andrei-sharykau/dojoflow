@@ -3,28 +3,32 @@
  */
 
 export const API_BASE_URL = 'http://localhost:8000'
-export const API_VERSION = 'v1'
-export const API_PREFIX = `/api/${API_VERSION}`
+export const API_PREFIX = '/api'
 
 // API endpoints
 export const API_ENDPOINTS = {
   // Auth
-  LOGIN: '/auth/login/',
-  LOGOUT: '/auth/logout/',
-  ME: '/auth/me/',
+  LOGIN: '/api/auth/login/',
+  LOGOUT: '/api/auth/logout/',
+  REFRESH: '/api/auth/refresh/',
+  
+  // Profile
+  ME: '/api/profile/me/',
+  MY_CLUBS: '/api/profile/my_clubs/',
+  PERMISSIONS: '/api/profile/permissions/',
   
   // Clubs
-  CLUBS: '/clubs/',
-  CLUBS_STUDENTS: '/clubs/students_by_club/',
+  CLUBS: '/api/clubs/',
+  CLUBS_STUDENTS: '/api/clubs/students_by_club/',
   
   // Students
-  STUDENTS: '/students/',
+  STUDENTS: '/api/students/',
   
   // Attestations
-  ATTESTATIONS: '/attestations/',
+  ATTESTATIONS: '/api/attestations/',
   
   // Attestation Levels
-  ATTESTATION_LEVELS: '/attestation_levels/',
+  ATTESTATION_LEVELS: '/api/attestation-levels/',
 } as const
 
 // HTTP статусы

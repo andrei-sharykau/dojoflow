@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User, Club, LoginCredentials, UserPermissions } from '../types'
 import { authAPI } from '../services/api'
+import { tokenStorage } from '../utils/storage'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -12,7 +13,7 @@ export const useAuthStore = defineStore('auth', () => {
   const initialized = ref(false)
 
   const isAuthenticated = computed(() => {
-    return !!localStorage.getItem('access_token') && !!user.value
+    return !!tokenStorage.getToken() && !!user.value
   })
 
   const isSuperuser = computed(() => {
@@ -28,16 +29,21 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = true
       error.value = null
       
+      console.log('Auth: попытка логина для пользователя:', credentials.username)
       const tokens = await authAPI.login(credentials)
+      console.log('Auth: получен токен, сохраняем...')
       
-      localStorage.setItem('access_token', tokens.access)
-      localStorage.setItem('refresh_token', tokens.refresh)
+      tokenStorage.setToken(tokens.access)
+      tokenStorage.setRefreshToken(tokens.refresh)
       
+      console.log('Auth: загружаем данные пользователя...')
       await loadUser()
       
+      console.log('Auth: логин успешен!')
       return true
     } catch (err: any) {
-      error.value = err.response?.data?.detail || 'Ошибка входа в систему'
+      console.error('Auth: ошибка логина:', err)
+      error.value = err.response?.data?.detail || err.message || 'Ошибка входа в систему'
       return false
     } finally {
       loading.value = false
@@ -46,25 +52,29 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
+      console.log('Auth: попытка выхода...')
       await authAPI.logout()
     } catch (err) {
-      console.error('Ошибка при выходе:', err)
+      console.error('Auth: ошибка при выходе:', err)
     } finally {
+      console.log('Auth: очищаем локальные данные...')
       user.value = null
       userClubs.value = []
       permissions.value = null
       initialized.value = false
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
+      tokenStorage.clearAllTokens()
     }
   }
 
   async function loadUser() {
     try {
-      if (!localStorage.getItem('access_token')) {
+      const token = tokenStorage.getToken()
+      if (!token) {
+        console.log('Auth: нет токена для загрузки пользователя')
         return false
       }
 
+      console.log('Auth: есть токен, загружаем данные пользователя...')
       loading.value = true
       
       const [userData, clubsData, permissionsData] = await Promise.all([
@@ -73,6 +83,7 @@ export const useAuthStore = defineStore('auth', () => {
         authAPI.getUserPermissions(),
       ])
 
+      console.log('Auth: данные пользователя загружены:', userData.username)
       user.value = userData
       userClubs.value = clubsData
       permissions.value = permissionsData
@@ -80,7 +91,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       return true
     } catch (err) {
-      console.error('Ошибка загрузки пользователя:', err)
+      console.error('Auth: ошибка загрузки пользователя:', err)
       await logout()
       return false
     } finally {
@@ -91,10 +102,13 @@ export const useAuthStore = defineStore('auth', () => {
   async function checkAuth() {
     // Если уже инициализирован, возвращаем текущее состояние
     if (initialized.value) {
+      console.log('Auth: уже инициализирован, возвращаем:', isAuthenticated.value)
       return isAuthenticated.value
     }
 
-    const token = localStorage.getItem('access_token')
+    const token = tokenStorage.getToken()
+    console.log('Auth: проверяем токен:', token ? 'есть' : 'нет')
+    
     if (!token) {
       initialized.value = true
       return false
@@ -102,10 +116,12 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Если есть токен, но нет данных пользователя, загружаем их
     if (!user.value) {
+      console.log('Auth: есть токен, но нет данных пользователя, загружаем...')
       const success = await loadUser()
       return success
     }
 
+    console.log('Auth: есть токен и данные пользователя')
     initialized.value = true
     return true
   }

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.db.models import Q
-from .models import Club, AttestationLevel, Student, Attestation, ClubAdmin
+from .models import Club, AttestationLevel, Student, Attestation, ClubAdmin, StudentAttestation
 
 
 @admin.register(Club)
@@ -26,22 +26,26 @@ class AttestationLevelAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
 
-class AttestationInline(admin.TabularInline):
-    model = Attestation
+class StudentAttestationInline(admin.TabularInline):
+    model = StudentAttestation
     extra = 0
-    fields = ['level', 'date', 'city', 'notes']
-    ordering = ['-date']
+    verbose_name = "Аттестация"
+    verbose_name_plural = "Аттестации"
+    fields = ['attestation', 'level']
+    autocomplete_fields = ['attestation']
 
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     list_display = [
         'last_name', 'first_name', 'middle_name', 
-        'club', 'current_level', 'start_date', 'last_attestation_date'
+        'club', 'get_current_level', 'start_date', 'get_last_attestation_date'
     ]
-    list_filter = ['club', 'current_level', 'city', 'start_date']
+    list_filter = ['club', 'city', 'start_date']
     search_fields = ['last_name', 'first_name', 'middle_name', 'phone']
     ordering = ['last_name', 'first_name']
+    
+    inlines = [StudentAttestationInline]
     
     fieldsets = (
         ('Основная информация', {
@@ -51,11 +55,20 @@ class StudentAdmin(admin.ModelAdmin):
             'fields': ('city', 'address', 'phone', 'workplace')
         }),
         ('Информация о занятиях', {
-            'fields': ('start_date', 'current_level', 'last_attestation_date')
+            'fields': ('start_date',)
         }),
     )
     
-    inlines = [AttestationInline]
+    def get_current_level(self, obj):
+        level = obj.current_level
+        return level.get_level_display() if level else 'Нет аттестаций'
+    get_current_level.short_description = 'Текущий уровень'
+    get_current_level.admin_order_field = 'student_attestations__level__order'
+    
+    def get_last_attestation_date(self, obj):
+        return obj.last_attestation_date or 'Нет аттестаций'
+    get_last_attestation_date.short_description = 'Последняя аттестация'
+    get_last_attestation_date.admin_order_field = 'student_attestations__attestation__date'
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -95,34 +108,54 @@ class StudentAdmin(admin.ModelAdmin):
             return False
 
 
-@admin.register(Attestation)
-class AttestationAdmin(admin.ModelAdmin):
-    list_display = ['student', 'level', 'date', 'city']
-    list_filter = ['level', 'date', 'city', 'student__club']
-    search_fields = ['student__last_name', 'student__first_name', 'city']
-    ordering = ['-date']
+@admin.register(StudentAttestation)
+class StudentAttestationAdmin(admin.ModelAdmin):
+    list_display = ['student', 'attestation', 'level', 'attestation_date']
+    list_filter = ['attestation__date', 'level', 'student__club']
+    search_fields = ['student__last_name', 'student__first_name', 'attestation__city']
+    ordering = ['-attestation__date']
+    autocomplete_fields = ['student', 'attestation']
+    
+    def attestation_date(self, obj):
+        return obj.attestation.date
+    attestation_date.short_description = 'Дата аттестации'
+    attestation_date.admin_order_field = 'attestation__date'
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
         
-        # Если пользователь - администратор клуба, показываем только аттестации его студентов
+        # Если пользователь - администратор клуба, показываем только его студентов
         try:
             user_clubs = Club.objects.filter(admins__user=request.user)
             return qs.filter(student__club__in=user_clubs)
         except:
             return qs.none()
+
+
+@admin.register(Attestation)
+class AttestationAdmin(admin.ModelAdmin):
+    list_display = ['date', 'city', 'participants_count']
+    list_filter = ['date', 'city']
+    search_fields = ['city', 'date']
+    ordering = ['-date']
     
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "student":
-            if not request.user.is_superuser:
-                try:
-                    user_clubs = Club.objects.filter(admins__user=request.user)
-                    kwargs["queryset"] = Student.objects.filter(club__in=user_clubs)
-                except:
-                    kwargs["queryset"] = Student.objects.none()
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    def participants_count(self, obj):
+        return obj.participants.count()
+    participants_count.short_description = 'Участников'
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        
+        # Если пользователь - администратор клуба, показываем только аттестации с его студентами
+        try:
+            user_clubs = Club.objects.filter(admins__user=request.user)
+            return qs.filter(participants__club__in=user_clubs).distinct()
+        except:
+            return qs.none()
 
 
 @admin.register(ClubAdmin)

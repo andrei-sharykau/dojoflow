@@ -94,16 +94,13 @@ class Student(models.Model):
     
     # Информация о занятиях
     start_date = models.DateField(verbose_name="Дата начала занятий")
-    current_level = models.ForeignKey(
-        AttestationLevel,
-        on_delete=models.PROTECT,
-        verbose_name="Текущий уровень аттестации",
-        related_name="students"
-    )
-    last_attestation_date = models.DateField(
-        null=True, 
+    
+    # Участие в аттестациях
+    attestations = models.ManyToManyField(
+        'Attestation',
         blank=True,
-        verbose_name="Дата последней аттестации"
+        verbose_name="Участие в аттестациях",
+        related_name="participants"
     )
     
     # Системные поля
@@ -122,24 +119,29 @@ class Student(models.Model):
     def full_name(self):
         """Полное имя"""
         return f"{self.last_name} {self.first_name} {self.middle_name}".strip()
+    
+    @property
+    def current_level(self):
+        """Текущий уровень (из последней аттестации)"""
+        latest_student_attestation = self.student_attestations.select_related('level').order_by('-attestation__date').first()
+        return latest_student_attestation.level if latest_student_attestation else None
+    
+    @property
+    def last_attestation_date(self):
+        """Дата последней аттестации (вычисляется автоматически)"""
+        latest_student_attestation = self.student_attestations.select_related('attestation').order_by('-attestation__date').first()
+        return latest_student_attestation.attestation.date if latest_student_attestation else None
+    
+    @property
+    def attestation_history(self):
+        """История аттестаций студента"""
+        return self.student_attestations.select_related('attestation', 'level').order_by('-attestation__date')
 
 
 class Attestation(models.Model):
-    """Модель аттестации"""
-    student = models.ForeignKey(
-        Student,
-        on_delete=models.CASCADE,
-        verbose_name="Занимающийся",
-        related_name="attestations"
-    )
-    level = models.ForeignKey(
-        AttestationLevel,
-        on_delete=models.PROTECT,
-        verbose_name="Уровень аттестации"
-    )
+    """Модель аттестации - мероприятие/событие"""
     date = models.DateField(verbose_name="Дата аттестации")
     city = models.CharField(max_length=100, verbose_name="Место проведения (город)")
-    notes = models.TextField(blank=True, verbose_name="Примечания")
     
     # Системные поля
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания записи")
@@ -148,10 +150,44 @@ class Attestation(models.Model):
         verbose_name = "Аттестация"
         verbose_name_plural = "Аттестации"
         ordering = ['-date']
-        unique_together = ['student', 'level']  # Один студент не может иметь две аттестации одного уровня
+        unique_together = ['date', 'city']  # Одна аттестация в день в одном городе
     
     def __str__(self):
-        return f"{self.student.full_name} - {self.level} ({self.date})"
+        return f"Аттестация {self.date} ({self.city})"
+
+
+class StudentAttestation(models.Model):
+    """Промежуточная модель для связи студент-аттестация с указанием полученного уровня"""
+    student = models.ForeignKey(
+        'Student',
+        on_delete=models.CASCADE,
+        verbose_name="Студент",
+        related_name="student_attestations"
+    )
+    attestation = models.ForeignKey(
+        Attestation,
+        on_delete=models.CASCADE,
+        verbose_name="Аттестация",
+        related_name="student_attestations"
+    )
+    level = models.ForeignKey(
+        AttestationLevel,
+        on_delete=models.PROTECT,
+        verbose_name="Полученный уровень",
+        related_name="student_attestations"
+    )
+    
+    # Системные поля
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания записи")
+    
+    class Meta:
+        verbose_name = "Участие в аттестации"
+        verbose_name_plural = "Участия в аттестациях"
+        unique_together = ['student', 'attestation']  # Студент может участвовать в аттестации только один раз
+        ordering = ['-attestation__date']
+    
+    def __str__(self):
+        return f"{self.student} - {self.attestation} ({self.level})"
 
 
 class ClubAdmin(models.Model):

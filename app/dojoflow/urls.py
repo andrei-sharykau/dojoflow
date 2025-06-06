@@ -5,16 +5,16 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from .api_views import (
-    ClubViewSet, AttestationLevelViewSet, StudentViewSet,
-    AttestationViewSet, UserProfileViewSet
+    ClubViewSet, AttestationLevelViewSet, StudentViewSet, UserProfileViewSet
 )
+# TODO: Заменить на новый StudentViewSet после исправления ошибок
+# from .api.v1.views.student import StudentViewSet
 
 # Создаем роутер для API
 router = DefaultRouter()
 router.register(r'clubs', ClubViewSet, basename='club')
 router.register(r'attestation-levels', AttestationLevelViewSet, basename='attestationlevel')
 router.register(r'students', StudentViewSet, basename='student')
-router.register(r'attestations', AttestationViewSet, basename='attestation')
 router.register(r'profile', UserProfileViewSet, basename='userprofile')
 
 urlpatterns = [

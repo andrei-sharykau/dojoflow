@@ -8,13 +8,59 @@
 export async function handleApiResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let errorMessage = `HTTP Error: ${response.status}`
+    let errorDetails: any = null
     
     try {
       const errorData = await response.json()
-      errorMessage = errorData.message || errorData.error || errorMessage
+      errorDetails = errorData
+      
+      // Специальная обработка для разных типов ошибок
+      if (response.status === 401) {
+        errorMessage = errorData.detail || 'Не авторизован. Войдите в систему.'
+      } else if (response.status === 403) {
+        errorMessage = errorData.detail || 'Недостаточно прав для выполнения операции'
+      } else if (response.status === 400) {
+        if (errorData.detail) {
+          errorMessage = errorData.detail
+        } else if (typeof errorData === 'object') {
+          // Обработка ошибок валидации
+          const validationErrors = []
+          for (const [field, messages] of Object.entries(errorData)) {
+            if (Array.isArray(messages)) {
+              validationErrors.push(`${field}: ${messages.join(', ')}`)
+            } else if (typeof messages === 'string') {
+              validationErrors.push(`${field}: ${messages}`)
+            }
+          }
+          if (validationErrors.length > 0) {
+            errorMessage = `Ошибка валидации: ${validationErrors.join('; ')}`
+          }
+        } else {
+          errorMessage = 'Некорректный запрос'
+        }
+      } else {
+        errorMessage = errorData.message || errorData.error || errorMessage
+      }
     } catch {
       // Если не удалось распарсить JSON, используем статус
+      if (response.status === 401) {
+        errorMessage = 'Не авторизован. Войдите в систему.'
+      } else if (response.status === 403) {
+        errorMessage = 'Недостаточно прав для выполнения операции'
+      } else if (response.status === 404) {
+        errorMessage = 'Ресурс не найден'
+      } else if (response.status >= 500) {
+        errorMessage = 'Ошибка сервера. Попробуйте позже.'
+      }
     }
+    
+    console.error('API Error:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: response.url,
+      details: errorDetails,
+      message: errorMessage
+    })
     
     throw new Error(errorMessage)
   }

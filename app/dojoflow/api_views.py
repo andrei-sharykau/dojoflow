@@ -9,6 +9,7 @@ from .serializers import (
     StudentDetailSerializer, StudentCreateUpdateSerializer, AttestationSerializer,
     UserSerializer, ClubAdminSerializer
 )
+# Импорт нового StudentViewSet перенесен в urls.py
 
 
 class IsClubAdminOrSuperuser(permissions.BasePermission):
@@ -48,7 +49,7 @@ class ClubViewSet(viewsets.ReadOnlyModelViewSet):
         result = []
         
         for club in clubs:
-            students = club.students.select_related('current_level').order_by('last_name', 'first_name')
+            students = club.students.order_by('last_name', 'first_name')
             
             # Применяем поиск если указан
             search = request.query_params.get('search', None)
@@ -111,7 +112,7 @@ class StudentViewSet(viewsets.ModelViewSet):
                 Q(phone__icontains=search)
             )
         
-        return queryset.select_related('club', 'current_level').order_by('last_name', 'first_name')
+        return queryset.select_related('club').order_by('last_name', 'first_name')
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -148,55 +149,6 @@ class StudentViewSet(viewsets.ModelViewSet):
                 new_club = serializer.validated_data['club']
                 if new_club not in user_clubs:
                     raise permissions.PermissionDenied("У вас нет прав для перевода студента в этот клуб")
-        
-        serializer.save()
-    
-    @action(detail=True, methods=['get'])
-    def attestations(self, request, pk=None):
-        """Получить аттестации студента"""
-        student = self.get_object()
-        attestations = student.attestations.all().select_related('level')
-        serializer = AttestationSerializer(attestations, many=True)
-        return Response(serializer.data)
-
-
-class AttestationViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet для аттестаций
-    """
-    serializer_class = AttestationSerializer
-    permission_classes = [IsClubAdminOrSuperuser]
-    
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_superuser:
-            queryset = Attestation.objects.all()
-        else:
-            # Возвращаем только аттестации студентов из клубов пользователя
-            user_clubs = Club.objects.filter(admins__user=user)
-            queryset = Attestation.objects.filter(student__club__in=user_clubs)
-        
-        # Фильтрация по студенту
-        student_id = self.request.query_params.get('student', None)
-        if student_id:
-            queryset = queryset.filter(student_id=student_id)
-        
-        # Фильтрация по клубу
-        club_id = self.request.query_params.get('club', None)
-        if club_id:
-            queryset = queryset.filter(student__club_id=club_id)
-        
-        return queryset.select_related('student', 'level', 'student__club').order_by('-date')
-    
-    def perform_create(self, serializer):
-        # Проверяем права при создании
-        student = serializer.validated_data['student']
-        user = self.request.user
-        
-        if not user.is_superuser:
-            user_clubs = Club.objects.filter(admins__user=user)
-            if student.club not in user_clubs:
-                raise permissions.PermissionDenied("У вас нет прав для создания аттестаций для этого студента")
         
         serializer.save()
 

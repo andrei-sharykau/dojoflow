@@ -1,3 +1,7 @@
+"""
+API v1 Serializers
+"""
+
 from .auth import UserSerializer, LoginSerializer
 from .club import ClubSerializer, ClubDetailSerializer, ClubWithStudentsSerializer
 from .student import (
@@ -5,7 +9,7 @@ from .student import (
     StudentDetailSerializer, 
     StudentCreateUpdateSerializer
 )
-from .attestation import AttestationSerializer, AttestationCreateUpdateSerializer
+from .attestation import AttestationSerializer, AttestationDetailSerializer
 from .attestation_level import AttestationLevelSerializer
 
 __all__ = [
@@ -25,8 +29,8 @@ __all__ = [
     
     # Attestation
     'AttestationSerializer',
-    'AttestationCreateUpdateSerializer',
+    'AttestationDetailSerializer',
     
-    # AttestationLevel
+    # Attestation Level
     'AttestationLevelSerializer',
 ] 

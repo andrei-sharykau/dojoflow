@@ -29,6 +29,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/students/create',
+      name: 'student-create',
+      component: () => import('../views/StudentCreateView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/students-by-club',
       name: 'students-by-club',
       component: () => import('../views/StudentsByClubView.vue'),
@@ -41,9 +47,9 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: '/attestations',
-      name: 'attestations',
-      component: () => import('../views/AttestationsView.vue'),
+      path: '/students/:id/edit',
+      name: 'student-edit',
+      component: () => import('../views/StudentCreateView.vue'),
       meta: { requiresAuth: true }
     },
     {
@@ -58,22 +64,34 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   
+  console.log(`Router: переход с ${from.path} на ${to.path}`)
+  console.log(`Router: требуется авторизация: ${to.meta.requiresAuth !== false}`)
+  
+  // Для страницы логина просто пропускаем
+  if (to.name === 'login') {
+    console.log('Router: переход на страницу логина, пропускаем')
+    next()
+    return
+  }
+  
   // Инициализируем auth store если еще не инициализирован
-  const isAuthenticated = await authStore.initialize()
-  
-  // Если пользователь авторизован и идет на страницу логина, перенаправляем на дашборд
-  if (to.name === 'login' && isAuthenticated) {
-    next({ name: 'dashboard' })
-    return
-  }
-  
-  // Если маршрут требует аутентификации и пользователь не авторизован
-  if (to.meta.requiresAuth !== false && !isAuthenticated) {
+  try {
+    const isAuthenticated = await authStore.initialize()
+    console.log(`Router: результат инициализации auth store: ${isAuthenticated}`)
+    
+    // Если маршрут требует аутентификации и пользователь не авторизован
+    if (to.meta.requiresAuth !== false && !isAuthenticated) {
+      console.log('Router: пользователь не авторизован, перенаправляем на логин')
+      next({ name: 'login' })
+      return
+    }
+    
+    console.log('Router: пользователь авторизован, продолжаем')
+    next()
+  } catch (error) {
+    console.error('Router: ошибка при инициализации auth store:', error)
     next({ name: 'login' })
-    return
   }
-  
-  next()
 })
 
 export default router

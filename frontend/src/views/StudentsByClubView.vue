@@ -74,7 +74,17 @@
                     {{ club.city }} • {{ club.students_count }} студентов
                   </p>
                 </div>
-                <span class="badge bg-primary">{{ club.students_count }}</span>
+                <div class="d-flex align-items-center gap-2">
+                  <button 
+                    type="button" 
+                    class="btn btn-sm btn-primary"
+                    @click="$router.push({ name: 'student-create', query: { club: club.id } })"
+                  >
+                    <i class="bi bi-plus-lg me-1"></i>
+                    Добавить студента
+                  </button>
+                  <span class="badge bg-primary">{{ club.students_count }}</span>
+                </div>
               </div>
             </div>
 
@@ -93,10 +103,12 @@
                     <tr>
                       <th class="border-0">Студент</th>
                       <th class="border-0">Возраст</th>
+                      <th class="border-0">Стаж</th>
                       <th class="border-0">Телефон</th>
                       <th class="border-0">Уровень</th>
                       <th class="border-0">Начало занятий</th>
                       <th class="border-0">Последняя аттестация</th>
+                      <th class="border-0">Действия</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -116,6 +128,9 @@
                         <span class="badge bg-light text-gray-700">{{ student.age }} лет</span>
                       </td>
                       <td class="border-0">
+                        <span class="badge bg-info text-white">{{ student.years_of_practice }} {{ student.years_of_practice === 1 ? 'год' : student.years_of_practice < 5 ? 'года' : 'лет' }}</span>
+                      </td>
+                      <td class="border-0">
                         <a :href="`tel:${student.phone}`" class="text-decoration-none">
                           {{ student.phone }}
                         </a>
@@ -130,6 +145,34 @@
                         <small class="text-gray-600">
                           {{ student.last_attestation_date ? formatDate(student.last_attestation_date) : 'Нет данных' }}
                         </small>
+                      </td>
+                      <td class="border-0">
+                        <div class="btn-group" role="group">
+                          <button 
+                            type="button" 
+                            class="btn btn-sm btn-outline-primary"
+                            @click.stop="$router.push(`/students/${student.id}`)"
+                            title="Просмотр деталей"
+                          >
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button 
+                            type="button" 
+                            class="btn btn-sm btn-outline-secondary"
+                            @click.stop="$router.push({ name: 'student-edit', params: { id: student.id } })"
+                            title="Редактировать"
+                          >
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                          <button 
+                            type="button" 
+                            class="btn btn-sm btn-outline-danger"
+                            @click.stop="openDeleteModal(student)"
+                            title="Удалить"
+                          >
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -164,19 +207,49 @@
         </div>
       </div>
     </div>
+
+    <!-- Модальное окно удаления -->
+    <StudentDeleteModal
+      v-if="studentToDelete"
+      :student="studentToDelete"
+      @delete="handleDeleteStudent"
+      @success="handleSuccess"
+      @error="handleError"
+    />
+
+    <!-- Уведомления -->
+    <div v-if="successMessage" class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+      <div class="alert alert-success alert-dismissible" role="alert">
+        <i class="bi bi-check-circle me-2"></i>
+        {{ successMessage }}
+        <button type="button" class="btn-close" @click="successMessage = ''"></button>
+      </div>
+    </div>
+
+    <div v-if="errorMessage" class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+      <div class="alert alert-danger alert-dismissible" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        {{ errorMessage }}
+        <button type="button" class="btn-close" @click="errorMessage = ''"></button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { clubsAPI } from '../services/api'
-import type { ClubWithStudents } from '../types'
+import { clubsAPI, studentsAPI } from '../services/api'
+import type { ClubWithStudents, Student, StudentDetail } from '../types'
+import StudentDeleteModal from '@/components/StudentDeleteModal.vue'
 
 // Состояние
 const clubsWithStudents = ref<ClubWithStudents[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const searchQuery = ref('')
+const studentToDelete = ref<StudentDetail | null>(null)
+const successMessage = ref('')
+const errorMessage = ref('')
 
 // Вычисляемые свойства
 const totalClubs = computed(() => clubsWithStudents.value.length)
@@ -218,6 +291,69 @@ const debouncedSearch = () => {
   searchTimeout = setTimeout(() => {
     loadStudentsByClub(searchQuery.value || undefined)
   }, 300)
+}
+
+// Функции для удаления студентов
+const openDeleteModal = async (student: Student) => {
+  try {
+    // Преобразуем Student в StudentDetail формат для модального окна
+    studentToDelete.value = {
+      ...student,
+      attestations: [], // Пустой массив, так как в списке эта информация не загружена
+      next_attestation_eligible: {
+        eligible: false,
+        next_level: null,
+        reason: 'Информация недоступна'
+      }
+    } as StudentDetail
+    
+    // Открываем модальное окно
+    const modal = new (window as any).bootstrap.Modal(document.getElementById('studentDeleteModal'))
+    modal.show()
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Ошибка загрузки данных студента'
+  }
+}
+
+const handleDeleteStudent = async (studentId: number) => {
+  try {
+    await studentsAPI.deleteStudent(studentId)
+    
+    const studentName = studentToDelete.value?.full_name || 'Студент'
+    successMessage.value = `${studentName} успешно удален`
+    
+    // Удаляем из списка клубов
+    clubsWithStudents.value.forEach(club => {
+      const studentIndex = club.students.findIndex(s => s.id === studentId)
+      if (studentIndex !== -1) {
+        club.students.splice(studentIndex, 1)
+        club.students_count = Math.max(0, club.students_count - 1)
+      }
+    })
+    
+    // Закрываем модальное окно
+    const modal = document.getElementById('studentDeleteModal')
+    if (modal) {
+      const bootstrapModal = (window as any).bootstrap.Modal.getInstance(modal)
+      if (bootstrapModal) {
+        bootstrapModal.hide()
+      }
+    }
+    
+    studentToDelete.value = null
+    
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || err.message || 'Ошибка удаления студента'
+    console.error('Error deleting student:', err)
+  }
+}
+
+const handleSuccess = (message: string) => {
+  successMessage.value = message
+}
+
+const handleError = (message: string) => {
+  errorMessage.value = message
 }
 
 // Инициализация

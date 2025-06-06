@@ -1,5 +1,5 @@
 """
-Разрешения для работы с клубами
+Разрешения для операций с клубами
 """
 from rest_framework import permissions
 from dojoflow.models import ClubAdmin
@@ -7,33 +7,22 @@ from dojoflow.models import ClubAdmin
 
 class ClubPermission(permissions.BasePermission):
     """
-    Разрешение для работы с клубами
+    Разрешения для операций с клубами
     """
+    
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
         
-        # Суперпользователи имеют полный доступ
         if request.user.is_superuser:
             return True
         
-        # Администраторы клубов могут просматривать свои клубы
-        if request.method in permissions.SAFE_METHODS:
-            return ClubAdmin.objects.filter(user=request.user).exists()
-        
-        # Создание и изменение клубов только для суперпользователей
-        return False
-
+        # Только администраторы клубов могут работать с клубами
+        return ClubAdmin.objects.filter(user=request.user).exists()
+    
     def has_object_permission(self, request, view, obj):
-        if not request.user.is_authenticated:
-            return False
-        
         if request.user.is_superuser:
             return True
         
-        # Администраторы могут просматривать только свои клубы
-        if request.method in permissions.SAFE_METHODS:
-            return ClubAdmin.objects.filter(user=request.user, club=obj).exists()
-        
-        # Изменение и удаление только для суперпользователей
-        return False 
+        # Проверяем, является ли пользователь администратором данного клуба
+        return ClubAdmin.objects.filter(user=request.user, club=obj).exists() 

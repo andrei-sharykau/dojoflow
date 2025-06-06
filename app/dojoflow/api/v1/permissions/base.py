@@ -1,6 +1,7 @@
 """
-Базовые разрешения для API
+Базовые классы разрешений для API v1
 """
+
 from rest_framework import permissions
 from dojoflow.models import ClubAdmin
 
@@ -22,47 +23,39 @@ class IsClubAdminOrSuperuser(permissions.BasePermission):
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
-    Разрешение для редактирования только владельцем объекта
+    Разрешение, которое позволяет только владельцам объекта редактировать его
     """
     def has_object_permission(self, request, view, obj):
-        # Разрешения на чтение предоставляются для любого запроса,
-        # поэтому мы всегда разрешаем GET, HEAD или OPTIONS запросы.
+        # Разрешения на чтение для всех аутентифицированных пользователей
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # Разрешения на запись предоставляются только владельцу объекта.
+        # Права на запись только для владельца объекта
         return obj.owner == request.user
 
 
 class IsClubMember(permissions.BasePermission):
     """
-    Разрешение для участников клуба
+    Разрешение для членов клуба (студентов и администраторов)
     """
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
         
-        # Суперпользователи имеют доступ ко всему
         if request.user.is_superuser:
             return True
         
-        # Проверяем, является ли пользователь членом хотя бы одного клуба
+        # Проверяем, является ли пользователь администратором или студентом клуба
         return ClubAdmin.objects.filter(user=request.user).exists()
 
     def has_object_permission(self, request, view, obj):
-        if not request.user.is_authenticated:
-            return False
-        
         if request.user.is_superuser:
             return True
         
-        # Проверяем доступ к объекту в зависимости от его типа
-        if hasattr(obj, 'club'):
-            # Для объектов связанных с клубом (Student, Attestation)
-            user_clubs = ClubAdmin.objects.filter(user=request.user).values_list('club', flat=True)
-            return obj.club.id in user_clubs
-        elif hasattr(obj, 'admins'):
-            # Для самих клубов
-            return ClubAdmin.objects.filter(user=request.user, club=obj).exists()
+        # Получаем клуб из объекта
+        club = getattr(obj, 'club', None)
+        if not club:
+            return False
         
-        return False 
+        # Проверяем, является ли пользователь администратором этого клуба
+        return ClubAdmin.objects.filter(user=request.user, club=club).exists() 

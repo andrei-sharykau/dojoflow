@@ -60,8 +60,7 @@
                   </button>
                   <button 
                     class="btn btn-outline-danger btn-sm" 
-                    data-bs-toggle="modal" 
-                    data-bs-target="#studentDeleteModal"
+                    @click="showDeleteModal = true"
                   >
                     <i class="bi bi-trash me-1"></i>
                     Удалить
@@ -244,10 +243,12 @@
 
     <!-- Модальное окно удаления -->
     <StudentDeleteModal
+      v-if="student && showDeleteModal"
       :student="student"
       @delete="handleDelete"
       @success="handleSuccess"
       @error="handleError"
+      @close="showDeleteModal = false"
     />
 
     <!-- Уведомления -->
@@ -272,7 +273,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { studentsAPI } from '@/services/api'
+import { studentsService } from '@/services/api'
 import type { StudentDetail } from '@/types'
 import StudentDeleteModal from '@/components/StudentDeleteModal.vue'
 
@@ -284,6 +285,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const successMessage = ref('')
 const errorMessage = ref('')
+const showDeleteModal = ref(false)
 
 const loadStudent = async () => {
   try {
@@ -295,7 +297,7 @@ const loadStudent = async () => {
       throw new Error('Некорректный ID студента')
     }
     
-    student.value = await studentsAPI.getDetail(studentId)
+    student.value = await studentsService.getDetail(studentId)
   } catch (err: any) {
     error.value = err.response?.data?.message || err.message || 'Ошибка загрузки студента'
     console.error('Error loading student:', err)
@@ -324,19 +326,13 @@ const editStudent = () => {
 const handleDelete = async (studentId: number) => {
   try {
     loading.value = true
-    await studentsAPI.deleteStudent(studentId)
+    await studentsService.deleteStudent(studentId)
     
     const studentName = student.value?.full_name || 'Студент'
     successMessage.value = `${studentName} успешно удален`
     
     // Закрываем модальное окно
-    const modal = document.getElementById('studentDeleteModal')
-    if (modal) {
-      const bootstrapModal = (window as any).bootstrap.Modal.getInstance(modal)
-      if (bootstrapModal) {
-        bootstrapModal.hide()
-      }
-    }
+    showDeleteModal.value = false
     
     // Перенаправляем на главную страницу через некоторое время
     setTimeout(() => {

@@ -215,6 +215,7 @@
       @delete="handleDeleteStudent"
       @success="handleSuccess"
       @error="handleError"
+      @close="studentToDelete = null"
     />
 
     <!-- Уведомления -->
@@ -238,7 +239,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { clubsAPI, studentsAPI } from '../services/api'
+import { clubsAPI, studentsService } from '../services/api'
 import type { ClubWithStudents, Student, StudentDetail } from '../types'
 import StudentDeleteModal from '@/components/StudentDeleteModal.vue'
 
@@ -306,10 +307,6 @@ const openDeleteModal = async (student: Student) => {
         reason: 'Информация недоступна'
       }
     } as StudentDetail
-    
-    // Открываем модальное окно
-    const modal = new (window as any).bootstrap.Modal(document.getElementById('studentDeleteModal'))
-    modal.show()
   } catch (err: any) {
     errorMessage.value = err.response?.data?.message || 'Ошибка загрузки данных студента'
   }
@@ -317,7 +314,7 @@ const openDeleteModal = async (student: Student) => {
 
 const handleDeleteStudent = async (studentId: number) => {
   try {
-    await studentsAPI.deleteStudent(studentId)
+    await studentsService.deleteStudent(studentId)
     
     const studentName = studentToDelete.value?.full_name || 'Студент'
     successMessage.value = `${studentName} успешно удален`

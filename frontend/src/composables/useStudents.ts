@@ -3,7 +3,7 @@
  */
 
 import { ref, computed, reactive } from 'vue'
-import { studentsAPI } from '@/services/api'
+import { studentsService } from '@/services/api'
 import type { 
   Student, 
   StudentDetail, 
@@ -54,7 +54,7 @@ export function useStudents() {
         page_size: pagination.page_size
       }
       
-      const response = await studentsAPI.getStudents(searchParams)
+      const response = await studentsService.getStudents(searchParams)
       
       students.value = response.results
       Object.assign(pagination, response.pagination)
@@ -73,7 +73,7 @@ export function useStudents() {
       isLoading.value = true
       error.value = null
       
-      currentStudent.value = await studentsAPI.getDetail(id)
+      currentStudent.value = await studentsService.getDetail(id)
       
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Ошибка загрузки студента'
@@ -89,7 +89,7 @@ export function useStudents() {
       isLoading.value = true
       error.value = null
       
-      const student = await studentsAPI.createStudent(data)
+      const student = await studentsService.createStudent(data)
       
       // Добавляем в начало списка
       students.value.unshift(student)
@@ -110,7 +110,7 @@ export function useStudents() {
       isLoading.value = true
       error.value = null
       
-      const student = await studentsAPI.updateStudent(id, data)
+      const student = await studentsService.updateStudent(id, data)
       
       // Обновляем в списке
       const index = students.value.findIndex(s => s.id === id)
@@ -139,7 +139,7 @@ export function useStudents() {
       isLoading.value = true
       error.value = null
       
-      await studentsAPI.deleteStudent(id)
+      await studentsService.deleteStudent(id)
       
       // Удаляем из списка
       const index = students.value.findIndex(s => s.id === id)
@@ -190,7 +190,7 @@ export function useStudents() {
   // Загрузка статистики
   const loadStatistics = async (filterParams?: StudentFilters) => {
     try {
-      statistics.value = await studentsAPI.getStatistics(filterParams)
+      statistics.value = await studentsService.getStatistics(filterParams)
     } catch (err: any) {
       console.error('Error loading statistics:', err)
       statistics.value = null
@@ -203,7 +203,7 @@ export function useStudents() {
       isLoading.value = true
       error.value = null
       
-      const student = await studentsAPI.transferStudent(studentId, newClubId)
+      const student = await studentsService.transferStudent(studentId, newClubId)
       
       // Обновляем в списке
       const index = students.value.findIndex(s => s.id === studentId)

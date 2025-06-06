@@ -1,6 +1,6 @@
 <template>
-  <div class="modal fade show d-block" id="studentDeleteModal" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-dialog-centered">
+  <div class="modal fade show d-block" id="studentDeleteModal" tabindex="-1" style="background: rgba(0,0,0,0.5);" @click="closeModal">
+    <div class="modal-dialog modal-dialog-centered" @click.stop>
       <div class="modal-content border-0 shadow">
         <!-- Заголовок -->
         <div class="modal-header border-bottom-0 pb-2">

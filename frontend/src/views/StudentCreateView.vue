@@ -287,7 +287,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { studentsAPI, clubsAPI } from '@/services/api'
+import { studentsService, clubsAPI } from '@/services/api'
 import type { StudentCreateUpdate, StudentDetail, Club } from '@/types'
 
 const route = useRoute()
@@ -370,7 +370,7 @@ const loadData = async () => {
 
     // Если редактирование, загружаем данные студента
     if (isEditing.value && studentId.value) {
-      student.value = await studentsAPI.getDetail(studentId.value)
+      student.value = await studentsService.getDetail(studentId.value)
       
       // Заполняем форму данными студента
       Object.assign(form, {
@@ -431,12 +431,12 @@ const handleSubmit = async () => {
 
     let result
     if (isEditing.value && studentId.value) {
-      result = await studentsAPI.updateStudent(studentId.value, formData)
+      result = await studentsService.updateStudent(studentId.value, formData)
       const studentName = result.full_name || `${result.first_name} ${result.last_name}`.trim()
       successMessage.value = `Данные студента ${studentName} успешно обновлены`
     } else {
       console.log('StudentCreateView: создаем нового студента...')
-      result = await studentsAPI.createStudent(formData)
+      result = await studentsService.createStudent(formData)
       console.log('StudentCreateView: студент создан:', result)
       const studentName = result.full_name || `${result.first_name} ${result.last_name}`.trim()
       successMessage.value = `Студент ${studentName} успешно создан`

@@ -1,66 +1,145 @@
 /**
- * API сервис для студентов
+ * API сервис для работы со студентами
  */
 
 import { BaseApiService } from './base'
-import { API_ENDPOINTS } from '@/constants/api'
 import type { 
   Student, 
   StudentDetail, 
-  StudentCreateUpdate,
+  StudentCreateUpdate, 
   StudentFilters,
   StudentStatistics,
-  PaginatedResponse,
-  Attestation
+  PaginatedResponse 
 } from '@/types'
 
-export class StudentsApiService extends BaseApiService {
+export class StudentsService extends BaseApiService {
   constructor() {
-    super(API_ENDPOINTS.STUDENTS)
+    super('http://localhost:8000/api', '/students/')
   }
 
+  // Получение списка студентов с фильтрацией
   async getStudents(filters?: StudentFilters): Promise<PaginatedResponse<Student>> {
-    return await super.getAll<Student>(filters)
+    return this.get<PaginatedResponse<Student>>('/students/', filters)
   }
 
+  // Получение детальной информации о студенте
   async getDetail(id: number): Promise<StudentDetail> {
-    return await this.getById<StudentDetail>(id)
+    return this.get<StudentDetail>(`/students/${id}/`)
   }
 
-  async createStudent(data: StudentCreateUpdate): Promise<Student> {
-    return await this.create<Student, StudentCreateUpdate>(data)
+  // Создание нового студента
+  async createStudent(data: StudentCreateUpdate): Promise<StudentDetail> {
+    return this.post<StudentDetail>('/students/', data)
   }
 
-  async updateStudent(id: number, data: Partial<StudentCreateUpdate>): Promise<Student> {
-    return await this.update<Student, StudentCreateUpdate>(id, data)
+  // Обновление студента
+  async updateStudent(id: number, data: Partial<StudentCreateUpdate>): Promise<StudentDetail> {
+    return this.patch<StudentDetail>(`/students/${id}/`, data)
   }
 
+  // Удаление студента
   async deleteStudent(id: number): Promise<void> {
-    await this.delete(id)
+    return this.deleteRequest<void>(`/students/${id}/`)
   }
 
-  async getAttestations(id: number): Promise<Attestation[]> {
-    const api = this.getApi()
-    return await api.get<Attestation[]>(`${this.endpoint}${id}/attestations/`)
-  }
-
+  // Получение статистики по студентам
   async getStatistics(filters?: StudentFilters): Promise<StudentStatistics> {
-    const api = this.getApi()
-    return await api.get<StudentStatistics>(`${this.endpoint}statistics/`, filters)
+    return this.get<StudentStatistics>('/students/statistics/', filters)
   }
 
-  async getEligibleForAttestation(clubId?: number): Promise<Student[]> {
-    const api = this.getApi()
-    const params = clubId ? { club: clubId } : {}
-    return await api.get<Student[]>(`${this.endpoint}eligible_for_attestation/`, params)
+  // Проверка права на следующую аттестацию
+  async checkAttestationEligibility(id: number): Promise<{
+    eligible: boolean
+    next_level: string | null
+    reason: string
+  }> {
+    return this.get(`/students/${id}/attestation-eligibility/`)
   }
 
-  async transferStudent(id: number, newClubId: number): Promise<Student> {
-    const api = this.getApi()
-    return await api.post<Student>(`${this.endpoint}${id}/transfer/`, {
-      new_club: newClubId
+  // Поиск студентов
+  async searchStudents(query: string, filters?: Partial<StudentFilters>): Promise<PaginatedResponse<Student>> {
+    return this.get<PaginatedResponse<Student>>('/students/search/', {
+      q: query,
+      ...filters
     })
+  }
+
+  // Получение истории аттестаций студента
+  async getAttestationHistory(id: number): Promise<StudentDetail['attestations']> {
+    return this.get(`/students/${id}/attestations/`)
+  }
+
+  // Перевод студента в другой клуб
+  async transferStudent(id: number, newClubId: number): Promise<StudentDetail> {
+    return this.post<StudentDetail>(`/students/${id}/transfer/`, {
+      club: newClubId
+    })
+  }
+
+  // Экспорт данных студентов
+  async exportStudents(filters?: StudentFilters, format: 'csv' | 'xlsx' = 'csv'): Promise<Blob> {
+    const params = { ...filters, format }
+    const response = await this.client.get('/students/export/', {
+      params,
+      responseType: 'blob'
+    })
+    return response.data
+  }
+
+  // Импорт студентов из файла
+  async importStudents(
+    file: File, 
+    onProgress?: (progress: number) => void
+  ): Promise<{ 
+    success: number
+    errors: string[]
+    total: number 
+  }> {
+    return this.uploadFile('/students/import/', file, onProgress)
+  }
+
+  // Массовые операции
+  async bulkDelete(ids: number[]): Promise<{ deleted: number; errors: string[] }> {
+    return this.post('/students/bulk-delete/', { ids })
+  }
+
+  async bulkUpdate(
+    ids: number[], 
+    data: Partial<StudentCreateUpdate>
+  ): Promise<{ updated: number; errors: string[] }> {
+    return this.post('/students/bulk-update/', { ids, data })
+  }
+
+  // Получение студентов по клубу
+  async getByClub(clubId: number, filters?: Partial<StudentFilters>): Promise<PaginatedResponse<Student>> {
+    return this.get<PaginatedResponse<Student>>('/students/', {
+      club: clubId,
+      ...filters
+    })
+  }
+
+  // Получение недавно добавленных студентов
+  async getRecent(limit = 10): Promise<Student[]> {
+    const response = await this.get<PaginatedResponse<Student>>('/students/', {
+      ordering: '-created_at',
+      limit
+    })
+    return response.results
+  }
+
+  // Получение студентов с днем рождения сегодня
+  async getBirthdayToday(): Promise<Student[]> {
+    return this.get('/students/birthday-today/')
+  }
+
+  // Получение студентов готовых к аттестации
+  async getReadyForAttestation(): Promise<Student[]> {
+    return this.get('/students/ready-for-attestation/')
   }
 }
 
-export const studentsAPI = new StudentsApiService() 
+// Экспортируем экземпляр сервиса
+export const studentsService = new StudentsService()
+
+// Экспортируем класс для возможности создания других экземпляров
+export default StudentsService 

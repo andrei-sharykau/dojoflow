@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Student, StudentCreate, AttestationLevel } from '../types'
-import { studentsAPI, attestationLevelsAPI } from '../services/api'
+import type { Student, StudentCreateUpdate, AttestationLevel } from '../types'
+import { studentsService, attestationLevelsAPI } from '../services/api'
 
 export const useStudentsStore = defineStore('students', () => {
   const students = ref<Student[]>([])
@@ -20,7 +20,7 @@ export const useStudentsStore = defineStore('students', () => {
       loading.value = true
       error.value = null
 
-      const response = await studentsAPI.getAll(params)
+      const response = await studentsService.getStudents(params)
       
       students.value = response.results
       pagination.value = {
@@ -41,7 +41,7 @@ export const useStudentsStore = defineStore('students', () => {
       loading.value = true
       error.value = null
 
-      const student = await studentsAPI.getById(id)
+      const student = await studentsService.getDetail(id)
       currentStudent.value = student
       
       return student
@@ -53,13 +53,13 @@ export const useStudentsStore = defineStore('students', () => {
     }
   }
 
-  async function createStudent(studentData: StudentCreate) {
+  async function createStudent(studentData: StudentCreateUpdate) {
     try {
       loading.value = true
       error.value = null
 
-      const newStudent = await studentsAPI.create(studentData)
-      students.value.unshift(newStudent)
+      const newStudent = await studentsService.createStudent(studentData)
+      students.value.unshift(newStudent as Student)
       
       return newStudent
     } catch (err: any) {
@@ -70,20 +70,20 @@ export const useStudentsStore = defineStore('students', () => {
     }
   }
 
-  async function updateStudent(id: number, studentData: Partial<StudentCreate>) {
+  async function updateStudent(id: number, studentData: Partial<StudentCreateUpdate>) {
     try {
       loading.value = true
       error.value = null
 
-      const updatedStudent = await studentsAPI.update(id, studentData)
+      const updatedStudent = await studentsService.updateStudent(id, studentData)
       
       const index = students.value.findIndex(s => s.id === id)
       if (index !== -1) {
-        students.value[index] = updatedStudent
+        students.value[index] = updatedStudent as Student
       }
       
       if (currentStudent.value?.id === id) {
-        currentStudent.value = updatedStudent
+        currentStudent.value = updatedStudent as Student
       }
       
       return updatedStudent
@@ -100,7 +100,7 @@ export const useStudentsStore = defineStore('students', () => {
       loading.value = true
       error.value = null
 
-      await studentsAPI.delete(id)
+      await studentsService.deleteStudent(id)
       
       students.value = students.value.filter(s => s.id !== id)
       
@@ -124,7 +124,7 @@ export const useStudentsStore = defineStore('students', () => {
       }
 
       const levels = await attestationLevelsAPI.getAll()
-      attestationLevels.value = levels
+      attestationLevels.value = levels.results || levels
       
       return levels
     } catch (err: any) {

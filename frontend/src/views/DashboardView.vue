@@ -142,7 +142,7 @@
         </div>
 
         <!-- Заглушка для студентов -->
-        <div v-else-if="students.length === 0" class="text-center py-5">
+        <div v-else-if="students && students.length === 0" class="text-center py-5">
           <div class="mb-4">
             <i class="bi bi-people text-gray-400" style="font-size: 4rem;"></i>
           </div>
@@ -178,7 +178,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="student in students" :key="student.id" class="cursor-pointer" @click="$router.push(`/students/${student.id}`)">
+              <tr v-for="student in (students || [])" :key="student.id" class="cursor-pointer" @click="$router.push(`/students/${student.id}`)">
                 <td class="border-0">
                   <div class="d-flex align-items-center">
                     <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
@@ -242,7 +242,7 @@
           </table>
 
           <!-- Пагинация -->
-          <div v-if="pagination.count > students.length" class="d-flex justify-content-center mt-4">
+          <div v-if="students && pagination.count > students.length" class="d-flex justify-content-center mt-4">
             <nav>
               <ul class="pagination pagination-sm">
                 <li class="page-item" :class="{ disabled: !pagination.previous }">
@@ -269,6 +269,7 @@
       @delete="handleDeleteStudent"
       @success="handleSuccess"
       @error="handleError"
+      @close="studentToDelete = null"
     />
 
     <!-- Уведомления -->
@@ -294,7 +295,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { studentsAPI } from '../services/api'
+import { studentsService } from '../services/api'
 import type { Student, StudentDetail } from '../types'
 import StudentDeleteModal from '@/components/StudentDeleteModal.vue'
 
@@ -334,7 +335,9 @@ const currentClubStudentsCount = computed(() => {
 
 // Функции
 const loadStudents = async (page = 1, search?: string) => {
-  if (!currentClub.value) return
+  if (!currentClub.value) {
+    return
+  }
 
   loading.value = true
   error.value = null
@@ -349,16 +352,21 @@ const loadStudents = async (page = 1, search?: string) => {
       params.search = search
     }
 
-    const response = await studentsAPI.getAll(params)
-    students.value = response.results
+    const response = await studentsService.getStudents(params)
+    console.log('DashboardView loadStudents response:', response)
+    
+    students.value = response.results || []
     pagination.value = {
-      count: response.count,
-      next: response.next,
-      previous: response.previous,
+      count: response.count || 0,
+      next: response.next || null,
+      previous: response.previous || null,
     }
+    
+    console.log('DashboardView students.value:', students.value)
   } catch (err) {
     error.value = 'Ошибка при загрузке студентов'
     console.error('Error loading students:', err)
+    students.value = []
   } finally {
     loading.value = false
   }
@@ -423,7 +431,7 @@ const openDeleteModal = async (student: Student) => {
 
 const handleDeleteStudent = async (studentId: number) => {
   try {
-    await studentsAPI.deleteStudent(studentId)
+    await studentsService.deleteStudent(studentId)
     
     const studentName = studentToDelete.value?.full_name || 'Студент'
     successMessage.value = `${studentName} успешно удален`
@@ -471,6 +479,11 @@ onMounted(async () => {
   // Загружаем данные пользователя, если они не загружены
   if (!authStore.user) {
     await authStore.loadUser()
+  }
+  
+  // Убеждаемся что студенты загружены после загрузки пользователя
+  if (currentClub.value) {
+    await loadStudents()
   }
 })
 </script>

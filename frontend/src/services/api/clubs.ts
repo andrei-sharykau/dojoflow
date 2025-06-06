@@ -3,6 +3,7 @@
  */
 
 import { BaseApiService } from './base'
+import { useApi } from '@/composables/useApi'
 import { API_ENDPOINTS } from '@/constants/api'
 import type { 
   Club, 
@@ -15,16 +16,20 @@ import type {
 
 export class ClubsApiService extends BaseApiService {
   constructor() {
-    super(API_ENDPOINTS.CLUBS)
+    super('http://localhost:8000/api', '/clubs/')
+  }
+
+  private getApi() {
+    return useApi()
   }
 
   async getAllClubs(): Promise<Club[]> {
-    const response = await super.getAll<Club>()
+    const response = await this.get<{ results: Club[] }>('/clubs/')
     return response.results || []
   }
 
   async getDetail(id: number): Promise<ClubDetail> {
-    return await this.getById<ClubDetail>(id)
+    return await this.get<ClubDetail>(`/clubs/${id}/`)
   }
 
   async getStudentsByClub(search?: string): Promise<ClubWithStudents[]> {
@@ -34,25 +39,23 @@ export class ClubsApiService extends BaseApiService {
   }
 
   async getStatistics(id: number): Promise<ClubStatistics> {
-    const api = this.getApi()
-    return await api.get<ClubStatistics>(`${this.endpoint}${id}/statistics/`)
+    return await this.get<ClubStatistics>(`/clubs/${id}/statistics/`)
   }
 
   async getPermissions(id: number): Promise<ClubPermissions> {
-    const api = this.getApi()
-    return await api.get<ClubPermissions>(`${this.endpoint}${id}/permissions/`)
+    return await this.get<ClubPermissions>(`/clubs/${id}/permissions/`)
   }
 
   async createClub(data: ClubCreateUpdate): Promise<Club> {
-    return await this.create<Club, ClubCreateUpdate>(data)
+    return await this.post<Club>('/clubs/', data)
   }
 
   async updateClub(id: number, data: Partial<ClubCreateUpdate>): Promise<Club> {
-    return await this.update<Club, ClubCreateUpdate>(id, data)
+    return await this.patch<Club>(`/clubs/${id}/`, data)
   }
 
   async deleteClub(id: number): Promise<void> {
-    await this.delete(id)
+    await this.deleteRequest(`/clubs/${id}/`)
   }
 }
 
